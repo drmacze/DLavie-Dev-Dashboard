@@ -142,6 +142,43 @@ export function formatDate(iso: string): string {
   }
 }
 
+/** Format ISO date as a short relative time in Indonesian ("2 jam lalu") */
+export function formatRelative(iso: string): string {
+  try {
+    const then = new Date(iso).getTime()
+    const now = Date.now()
+    const diff = Math.max(0, now - then)
+    const sec = Math.floor(diff / 1000)
+    const min = Math.floor(sec / 60)
+    const hr = Math.floor(min / 60)
+    const day = Math.floor(hr / 24)
+
+    if (sec < 60) return 'baru saja'
+    if (min < 60) return `${min} menit lalu`
+    if (hr < 24) return `${hr} jam lalu`
+    if (day < 7) return `${day} hari lalu`
+    return new Date(iso).toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    })
+  } catch {
+    return iso
+  }
+}
+
+/** Format a short date label "12 Mar" for chart axes */
+export function formatChartDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+    })
+  } catch {
+    return iso
+  }
+}
+
 /** Format a number with thousand separators */
 export function formatNumber(n: number): string {
   return n.toLocaleString('id-ID')

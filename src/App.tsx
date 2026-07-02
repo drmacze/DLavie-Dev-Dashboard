@@ -1,7 +1,8 @@
 import { Suspense, lazy } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
 import { useAdminCheck } from '@/hooks/useAdminCheck'
+import { PageTransition } from '@/components/PageTransition'
 import { Zap } from 'lucide-react'
 
 // Lazy-load pages to keep initial bundle small
@@ -68,6 +69,7 @@ function AdminGate({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
+  const location = useLocation()
   return (
     <Suspense fallback={<FullScreenLoader />}>
       <Routes>
@@ -76,20 +78,22 @@ function AppRoutes() {
           path="/*"
           element={
             <AdminGate>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/upload" element={<UploadPatch />} />
-                <Route path="/manifest" element={<ManifestEditor />} />
-                <Route path="/feed" element={<Feed />} />
-                <Route path="/patches" element={<Patches />} />
-                <Route path="/maintenance" element={<Maintenance />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="/stats" element={<Stats />} />
-                <Route path="/tickets" element={<Tickets />} />
-                <Route path="/activity-log" element={<ActivityLog />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+              <PageTransition key={location.pathname}>
+                <Routes location={location}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/upload" element={<UploadPatch />} />
+                  <Route path="/manifest" element={<ManifestEditor />} />
+                  <Route path="/feed" element={<Feed />} />
+                  <Route path="/patches" element={<Patches />} />
+                  <Route path="/maintenance" element={<Maintenance />} />
+                  <Route path="/users" element={<Users />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/stats" element={<Stats />} />
+                  <Route path="/tickets" element={<Tickets />} />
+                  <Route path="/activity-log" element={<ActivityLog />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </PageTransition>
             </AdminGate>
           }
         />

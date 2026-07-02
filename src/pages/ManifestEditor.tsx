@@ -1,10 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FileText, Save, AlertCircle, RefreshCw, CheckCircle2 } from 'lucide-react'
+import {
+  FileText,
+  Save,
+  AlertCircle,
+  RefreshCw,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Package,
+  FileCode,
+} from 'lucide-react'
 import { Layout } from '@/components/Layout'
 import { Card, CardHeader } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { Badge } from '@/components/Modal'
+import { SkeletonBlock } from '@/components/Skeleton'
+import { EmptyState } from '@/components/EmptyState'
 import { fetchManifest, formatBytes } from '@/lib/api'
 import type { Manifest } from '@/lib/api'
 
@@ -17,6 +29,13 @@ export default function ManifestEditor() {
   const [text, setText] = useState('')
   const [parseError, setParseError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [collapsed, setCollapsed] = useState<{ patches: boolean; files: boolean }>({
+    patches: false,
+    files: false,
+  })
+  const [sortKey, setSortKey] = useState<'type' | 'size' | 'name'>('type')
+  const taRef = useRef<HTMLTextAreaElement>(null)
+  const gutterRef = useRef<HTMLDivElement>(null)
 
   // Populate textarea once manifest loads
   useEffect(() => {
@@ -37,35 +56,94 @@ export default function ManifestEditor() {
     }
   }
 
+  // Tab key inserts two spaces instead of moving focus.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const ta = e.currentTarget
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const next = text.slice(0, start) + '  ' + text.slice(end)
+      handleTextChange(next)
+      requestAnimationFrame(() => {
+        ta.selectionStart = ta.selectionEnd = start + 2
+      })
+    }
+  }
+
+  function handleScroll() {
+    if (taRef.current && gutterRef.current) {
+      gutterRef.current.scrollTop = taRef.current.scrollTop
+    }
+  }
+
   function handleSave() {
-    // Phase 1: just acknowledge. Actual save needs GitHub token with write access.
     setSaved(true)
     setTimeout(() => setSaved(false), 4000)
   }
 
+  const lineCount = text.split('\n').length
+  const lineNumbers = useMemo(
+    () => Array.from({ length: lineCount }, (_, i) => i + 1),
+    [lineCount],
+  )
+
   const files = manifest?.files ?? []
   const patches = manifest?.patches ?? []
+
+  // Merge files + patches for a unified, sortable view.
+  type Row = {
+    kind: 'file' | 'patch'
+    name: string
+    type: string
+    size: number
+    sha?: string
+  }
+  const rows: Row[] = useMemo(() => {
+    const all: Row[] = [
+      ...files.map((f) => ({
+        kind: 'file' as const,
+        name: f.path,
+        type: f.type,
+        size: f.size ?? 0,
+        sha: f.sha256,
+      })),
+      ...patches.map((p) => ({
+        kind: 'patch' as const,
+        name: p.version,
+        type: 'patch',
+        size: p.size ?? 0,
+        sha: p.sha256,
+      })),
+    ]
+    all.sort((a, b) => {
+      if (sortKey === 'size') return b.size - a.size
+      if (sortKey === 'name') return a.name.localeCompare(b.name)
+      // type: patches first, then by type alpha
+      if (a.kind !== b.kind) return a.kind === 'patch' ? -1 : 1
+      return a.type.localeCompare(b.type)
+    })
+    return all
+  }, [files, patches, sortKey])
+
+  const isValid = !parseError && text.length > 0
 
   return (
     <Layout
       title="Manifest Editor"
       description="Edit manifest.json launcher DLavie"
+      breadcrumb={['Dashboard', 'Manifest Editor']}
       actions={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          loading={isFetching}
-        >
+        <Button variant="outline" size="sm" onClick={() => refetch()} loading={isFetching}>
           <RefreshCw className="h-3.5 w-3.5" />
-          Refresh
+          <span className="hidden sm:inline">Refresh</span>
         </Button>
       }
     >
       {isLoading ? (
         <div className="space-y-4">
-          <div className="h-24 rounded-card bg-bg-hover animate-pulse" />
-          <div className="h-96 rounded-card bg-bg-hover animate-pulse" />
+          <SkeletonBlock className="h-24 rounded-card" />
+          <SkeletonBlock className="h-96 rounded-card" />
         </div>
       ) : (
         <>
@@ -74,20 +152,13 @@ export default function ManifestEditor() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <SummaryItem label="Version" value={manifest?.version ?? '—'} mono />
               <SummaryItem label="Package" value={manifest?.package ?? '—'} mono />
-              <SummaryItem
-                label="Target Activity"
-                value={(manifest?.targetActivity as string) ?? '—'}
-                mono
-              />
-              <SummaryItem
-                label="Total Files"
-                value={`${files.length + patches.length} entri`}
-              />
+              <SummaryItem label="Target Activity" value={(manifest?.targetActivity as string) ?? '—'} mono />
+              <SummaryItem label="Total Entries" value={`${files.length + patches.length} entri`} />
             </div>
           </Card>
 
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-            {/* JSON editor */}
+            {/* JSON editor with line numbers */}
             <Card className="xl:col-span-3">
               <CardHeader
                 title="JSON Editor"
@@ -110,23 +181,39 @@ export default function ManifestEditor() {
               />
 
               {parseError && (
-                <div className="flex items-start gap-2 mb-3 p-3 rounded-input bg-danger/10 border border-danger/30 text-xs text-red-300">
+                <div className="flex items-start gap-2 mb-3 p-3 rounded-input bg-danger/10 border border-danger/30 text-xs text-danger animate-shake">
                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span className="font-mono">{parseError}</span>
+                  <span className="font-mono break-all">{parseError}</span>
                 </div>
               )}
 
-              <textarea
-                value={text}
-                onChange={(e) => handleTextChange(e.target.value)}
-                spellCheck={false}
-                className="w-full h-[480px] bg-black border border-border rounded-input p-4 font-mono text-xs leading-relaxed text-text-primary focus:outline-none focus:border-accent-cyan resize-none"
-                placeholder="Loading manifest…"
-              />
+              {/* Editor: line-number gutter + textarea, synced scroll */}
+              <div className="relative flex rounded-input border border-border overflow-hidden bg-black focus-within:border-accent-cyan transition-colors">
+                <div
+                  ref={gutterRef}
+                  className="select-none overflow-hidden py-3 px-2 text-right text-xs font-mono leading-relaxed text-text-dim bg-bg-card border-r border-border"
+                  style={{ minWidth: 44 }}
+                  aria-hidden="true"
+                >
+                  {lineNumbers.map((n) => (
+                    <div key={n}>{n}</div>
+                  ))}
+                </div>
+                <textarea
+                  ref={taRef}
+                  value={text}
+                  onChange={(e) => handleTextChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onScroll={handleScroll}
+                  spellCheck={false}
+                  className="flex-1 h-[480px] resize-none py-3 px-3 bg-transparent font-mono text-xs leading-relaxed text-text-primary focus:outline-none scrollbar-none"
+                  placeholder="Loading manifest…"
+                />
+              </div>
 
-              <div className="flex items-center justify-between mt-4">
-                <p className="text-xs text-text-dim">
-                  {text.length.toLocaleString('id-ID')} karakter · {text.split('\n').length} baris
+              <div className="flex items-center justify-between mt-4 gap-2">
+                <p className="text-xs text-text-dim font-mono">
+                  {text.length.toLocaleString('id-ID')} karakter · {lineCount} baris
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -137,11 +224,7 @@ export default function ManifestEditor() {
                   >
                     Reset
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleSave}
-                    disabled={!!parseError || !text}
-                  >
+                  <Button size="sm" onClick={handleSave} disabled={!isValid}>
                     <Save className="h-3.5 w-3.5" />
                     Simpan
                   </Button>
@@ -149,11 +232,11 @@ export default function ManifestEditor() {
               </div>
 
               {saved && (
-                <div className="mt-3 flex items-start gap-2 p-3 rounded-input bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
+                <div className="mt-3 flex items-start gap-2 p-3 rounded-input bg-accent-amber/10 border border-accent-amber/30 text-xs text-accent-amber animate-fade-in-up">
                   <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                   <span>
-                    Manifest akan diupdate di Phase 2 (butuh GitHub token dengan write access ke
-                    repo <code className="font-mono">DLavie-Launcher-Data</code>).
+                    Manifest akan diupdate di Phase 2 (butuh GitHub token dengan write access ke{' '}
+                    <code className="font-mono">DLavie-Launcher-Data</code>).
                   </span>
                 </div>
               )}
@@ -164,70 +247,58 @@ export default function ManifestEditor() {
               <CardHeader
                 title="File dalam Manifest"
                 subtitle={`${files.length} file · ${patches.length} patch`}
+                action={
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] uppercase tracking-widest2 text-text-dim hidden sm:inline">Sort</span>
+                    <select
+                      value={sortKey}
+                      onChange={(e) => setSortKey(e.target.value as 'type' | 'size' | 'name')}
+                      className="bg-bg-hover border border-border rounded-btn text-xs text-text-secondary px-2 py-1 focus:outline-none focus:border-accent-cyan"
+                    >
+                      <option value="type">Type</option>
+                      <option value="size">Size</option>
+                      <option value="name">Name</option>
+                    </select>
+                  </div>
+                }
               />
-              <div className="max-h-[520px] overflow-y-auto -mr-2 pr-2">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-bg-card">
-                    <tr className="text-left text-[10px] uppercase tracking-widest2 text-text-dim border-b border-border">
-                      <th className="py-2 pr-2 font-medium">Path</th>
-                      <th className="py-2 px-2 font-medium">Type</th>
-                      <th className="py-2 px-2 font-medium text-right">Size</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {files.map((f, i) => (
-                      <tr
-                        key={`f-${i}`}
-                        className="border-b border-border-subtle hover:bg-bg-hover transition-colors"
-                      >
-                        <td className="py-2 pr-2">
-                          <p className="text-xs font-mono text-text-primary truncate max-w-[160px]">
-                            {f.path}
-                          </p>
-                          <p className="text-[10px] font-mono text-text-dim truncate max-w-[160px]">
-                            {f.sha256?.slice(0, 16) ?? '—'}…
-                          </p>
-                        </td>
-                        <td className="py-2 px-2">
-                          <Badge variant="gray">{f.type}</Badge>
-                        </td>
-                        <td className="py-2 px-2 text-right text-xs font-mono text-text-muted">
-                          {formatBytes(f.size ?? 0)}
-                        </td>
-                      </tr>
-                    ))}
-                    {patches.map((p, i) => (
-                      <tr
-                        key={`p-${i}`}
-                        className="border-b border-border-subtle hover:bg-bg-hover transition-colors"
-                      >
-                        <td className="py-2 pr-2">
-                          <p className="text-xs font-mono text-text-primary truncate max-w-[160px]">
-                            {p.version}
-                          </p>
-                          <p className="text-[10px] text-text-muted truncate max-w-[160px]">
-                            {p.name}
-                          </p>
-                        </td>
-                        <td className="py-2 px-2">
-                          <Badge variant="cyan">patch</Badge>
-                        </td>
-                        <td className="py-2 px-2 text-right text-xs font-mono text-text-muted">
-                          {p.size ? formatBytes(p.size) : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                    {files.length === 0 && patches.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="py-8 text-center text-sm text-text-muted">
-                          <FileText className="h-6 w-6 text-text-dim mx-auto mb-2" />
-                          Tidak ada file di manifest
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+
+              {rows.length === 0 ? (
+                <EmptyState
+                  icon={FileText}
+                  title="Tidak ada file"
+                  subtitle="Belum ada entri file maupun patch di manifest."
+                />
+              ) : (
+                <div className="space-y-1 max-h-[520px] overflow-y-auto -mr-2 pr-1">
+                  {/* Patches group */}
+                  <SectionToggle
+                    label="Patches"
+                    count={patches.length}
+                    icon={Package}
+                    open={!collapsed.patches}
+                    onToggle={() => setCollapsed((c) => ({ ...c, patches: !c.patches }))}
+                  />
+                  {!collapsed.patches &&
+                    rows
+                      .filter((r) => r.kind === 'patch')
+                      .map((r, i) => <RowItem key={`p-${i}`} row={r} />)}
+
+                  {/* Files group */}
+                  <div className="mt-2" />
+                  <SectionToggle
+                    label="Files"
+                    count={files.length}
+                    icon={FileCode}
+                    open={!collapsed.files}
+                    onToggle={() => setCollapsed((c) => ({ ...c, files: !c.files }))}
+                  />
+                  {!collapsed.files &&
+                    rows
+                      .filter((r) => r.kind === 'file')
+                      .map((r, i) => <RowItem key={`f-${i}`} row={r} />)}
+                </div>
+              )}
             </Card>
           </div>
         </>
@@ -236,13 +307,62 @@ export default function ManifestEditor() {
   )
 }
 
+function SectionToggle({
+  label,
+  count,
+  icon: Icon,
+  open,
+  onToggle,
+}: {
+  label: string
+  count: number
+  icon: typeof Package
+  open: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-btn text-left hover:bg-bg-hover transition-colors group"
+    >
+      {open ? (
+        <ChevronDown className="h-3.5 w-3.5 text-text-dim" strokeWidth={2.5} />
+      ) : (
+        <ChevronRight className="h-3.5 w-3.5 text-text-dim" strokeWidth={2.5} />
+      )}
+      <Icon className="h-3.5 w-3.5 text-text-muted" strokeWidth={2} />
+      <span className="text-[11px] uppercase tracking-widest2 font-medium text-text-secondary">{label}</span>
+      <span className="text-[10px] text-text-dim font-mono">{count}</span>
+    </button>
+  )
+}
+
+function RowItem({
+  row,
+}: {
+  row: { kind: 'file' | 'patch'; name: string; type: string; size: number; sha?: string }
+}) {
+  return (
+    <div className="flex items-center gap-2 p-2 pl-7 rounded-input hover:bg-bg-hover transition-colors animate-fade-in">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-mono text-text-primary truncate">{row.name}</p>
+        {row.sha && (
+          <p className="text-[10px] font-mono text-text-dim truncate">{row.sha.slice(0, 16)}…</p>
+        )}
+      </div>
+      <Badge variant={row.kind === 'patch' ? 'cyan' : 'gray'}>{row.type}</Badge>
+      <span className="text-xs font-mono text-text-muted w-16 text-right shrink-0">
+        {formatBytes(row.size)}
+      </span>
+    </div>
+  )
+}
+
 function SummaryItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
       <p className="text-[10px] uppercase tracking-widest2 text-text-dim mb-1">{label}</p>
-      <p
-        className={`text-sm text-text-primary truncate ${mono ? 'font-mono text-xs' : 'font-semibold'}`}
-      >
+      <p className={`text-sm text-text-primary truncate ${mono ? 'font-mono text-xs' : 'font-semibold'}`}>
         {value}
       </p>
     </div>

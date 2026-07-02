@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Newspaper,
@@ -15,9 +15,11 @@ import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import { Input, Textarea, Select } from '@/components/Input'
 import { Badge, Modal } from '@/components/Modal'
+import { EmptyState } from '@/components/EmptyState'
+import { SkeletonFeedCard } from '@/components/Skeleton'
 import { supabase } from '@/lib/supabase'
 import type { FeedPost } from '@/lib/supabase'
-import { formatDate } from '@/lib/api'
+import { formatDate, formatRelative } from '@/lib/api'
 
 type PostType = 'info' | 'update' | 'maintenance'
 
@@ -79,20 +81,17 @@ export default function Feed() {
     <Layout
       title="Feed / Berita"
       description="Publikasi pengumuman & update ke user"
+      breadcrumb={['Dashboard', 'Feed']}
       actions={
         <>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            loading={isFetching}
-          >
+          <Button variant="outline" size="sm" onClick={() => refetch()} loading={isFetching}>
             <RefreshCw className="h-3.5 w-3.5" />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
           <Button size="sm" onClick={() => setFormOpen(true)}>
             <Plus className="h-3.5 w-3.5" />
-            Post Baru
+            <span className="hidden sm:inline">Post Baru</span>
+            <span className="sm:hidden">Post</span>
           </Button>
         </>
       }
@@ -115,31 +114,36 @@ export default function Feed() {
         </Card>
       ) : isLoading ? (
         <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-card bg-bg-hover animate-pulse" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <SkeletonFeedCard key={i} />
           ))}
         </div>
       ) : posts.length === 0 ? (
         <Card>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Newspaper className="h-10 w-10 text-text-dim mb-3" />
-            <p className="text-sm text-text-muted">Belum ada post</p>
-            <p className="text-xs text-text-dim mt-1 mb-4">
-              Buat post pertama untuk mengumumkan update atau info ke user.
-            </p>
-            <Button size="sm" onClick={() => setFormOpen(true)}>
-              <Plus className="h-3.5 w-3.5" />
-              Buat Post Pertama
-            </Button>
-          </div>
+          <EmptyState
+            icon={Newspaper}
+            title="Belum ada post"
+            subtitle="Buat post pertama untuk mengumumkan update atau info ke user."
+            accent="cyan"
+            action={
+              <Button size="sm" onClick={() => setFormOpen(true)}>
+                <Plus className="h-3.5 w-3.5" />
+                Buat Post Pertama
+              </Button>
+            }
+          />
         </Card>
       ) : (
         <div className="space-y-3">
-          {posts.map((post) => {
+          {posts.map((post, i) => {
             const tb = typeBadge[post.type as PostType] ?? typeBadge.info
             return (
-              <Card key={post.id} padding="md" className="hover:border-text-dim transition-colors">
-                <div className="flex items-start justify-between gap-4">
+              <Card
+                key={post.id}
+                padding="md"
+                className="card-hover-accent animate-fade-in-up"
+              >
+                <div style={{ animationDelay: `${Math.min(i, 6) * 50}ms` }} className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1.5">
                       <Badge variant={tb.variant}>{tb.label}</Badge>
@@ -155,11 +159,11 @@ export default function Feed() {
                           Official
                         </Badge>
                       )}
-                      <span className="text-xs text-text-dim">
-                        {formatDate(post.created_at)}
+                      <span className="text-xs text-text-dim" title={formatDate(post.created_at)}>
+                        {formatRelative(post.created_at)}
                       </span>
                     </div>
-                    <h3 className="text-base font-semibold tracking-tightest text-text-primary">
+                    <h3 className="text-base font-semibold tracking-tighter text-text-primary">
                       {post.title}
                     </h3>
                     {post.body && (
@@ -195,24 +199,14 @@ export default function Feed() {
         error={createMutation.error instanceof Error ? createMutation.error : null}
       />
 
-      {/* Delete confirm modal */}
-      <Modal
-        open={!!deleteTarget}
+      {/* Delete confirm modal — type "hapus" to confirm */}
+      <DeleteConfirmModal
+        target={deleteTarget}
         onClose={() => setDeleteTarget(null)}
-        title="Hapus Post?"
-        description="Tindakan ini tidak bisa dibatalkan."
-        confirmLabel="Ya, Hapus"
-        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+        onConfirm={(id) => deleteMutation.mutate(id)}
         loading={deleteMutation.isPending}
-      >
-        <div className="flex items-start gap-2 p-3 rounded-input bg-danger/10 border border-danger/30 text-sm text-red-300">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-          <span>
-            Post <span className="font-semibold text-text-primary">"{deleteTarget?.title}"</span>{' '}
-            akan dihapus permanen.
-          </span>
-        </div>
-      </Modal>
+        error={deleteMutation.error instanceof Error ? deleteMutation.error : null}
+      />
     </Layout>
   )
 }
@@ -264,11 +258,9 @@ function PostFormModal({
     <Modal open={open} onClose={handleClose} title="Post Baru" description="Buat pengumuman baru">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="flex items-start gap-2 p-3 rounded-input bg-danger/10 border border-danger/30 text-xs text-red-300">
+          <div className="flex items-start gap-2 p-3 rounded-input bg-danger/10 border border-danger/30 text-xs text-danger animate-shake">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            <span className="font-mono">
-              {error.message}
-            </span>
+            <span className="font-mono">{error.message}</span>
           </div>
         )}
 
@@ -332,6 +324,73 @@ function PostFormModal({
   )
 }
 
+/** Delete modal that requires the user to type "hapus" before enabling the confirm button. */
+function DeleteConfirmModal({
+  target,
+  onClose,
+  onConfirm,
+  loading,
+  error,
+}: {
+  target: FeedPost | null
+  onClose: () => void
+  onConfirm: (id: string) => void
+  loading: boolean
+  error: Error | null
+}) {
+  const [confirmText, setConfirmText] = useState('')
+
+  // Reset the typed confirmation whenever a different target is queued.
+  const targetId = target?.id
+  useEffect(() => {
+    setConfirmText('')
+  }, [targetId])
+
+  const canDelete = confirmText.trim().toLowerCase() === 'hapus'
+
+  return (
+    <Modal
+      open={!!target}
+      onClose={onClose}
+      title="Hapus Post?"
+      description="Tindakan ini tidak bisa dibatalkan."
+      confirmLabel="Ya, Hapus"
+      onConfirm={() => target && canDelete && onConfirm(target.id)}
+      loading={loading}
+    >
+      <div className="space-y-3">
+        {error && (
+          <div className="flex items-start gap-2 p-3 rounded-input bg-danger/10 border border-danger/30 text-xs text-danger animate-shake">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span className="font-mono">{error.message}</span>
+          </div>
+        )}
+        <div className="flex items-start gap-2 p-3 rounded-input bg-danger/10 border border-danger/30 text-sm text-danger">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            Post <span className="font-semibold text-text-primary">"{target?.title}"</span> akan
+            dihapus permanen.
+          </span>
+        </div>
+        <div>
+          <label htmlFor="confirm-delete" className="block mb-1.5 text-xs font-medium text-text-muted uppercase tracking-widest2">
+            Ketik <span className="font-mono text-danger">hapus</span> untuk konfirmasi
+          </label>
+          <input
+            id="confirm-delete"
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="hapus"
+            autoFocus
+            className="w-full bg-black text-text-primary rounded-input border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-danger focus:ring-1 focus:ring-danger/40"
+          />
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 function Toggle({
   label,
   description,
@@ -348,9 +407,7 @@ function Toggle({
       type="button"
       onClick={() => onChange(!checked)}
       className={`flex items-start gap-2.5 p-3 rounded-input border text-left transition-colors ${
-        checked
-          ? 'border-accent-cyan bg-accent-cyan/5'
-          : 'border-border hover:border-text-dim'
+        checked ? 'border-accent-cyan bg-accent-cyan/5' : 'border-border hover:border-border-hover'
       }`}
     >
       <div
@@ -360,7 +417,14 @@ function Toggle({
       >
         {checked && (
           <svg viewBox="0 0 12 12" className="h-2.5 w-2.5 text-black" fill="currentColor">
-            <path d="M10 3L4.5 8.5 2 6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M10 3L4.5 8.5 2 6"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         )}
       </div>

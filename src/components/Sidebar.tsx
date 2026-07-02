@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   Upload,
@@ -11,11 +11,9 @@ import {
   BarChart3,
   Ticket,
   History,
-  LogOut,
   Zap,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { Button } from '@/components/Button'
 
 type NavItem = {
   to: string
@@ -29,28 +27,27 @@ const items: NavItem[] = [
   { to: '/upload', label: 'Upload Patch', icon: Upload, phase: 1 },
   { to: '/manifest', label: 'Manifest Editor', icon: FileText, phase: 1 },
   { to: '/patches', label: 'Patch Management', icon: Package, phase: 2 },
-  { to: '/feed', label: 'Feed/Berita', icon: Newspaper, phase: 1 },
+  { to: '/feed', label: 'Feed / Berita', icon: Newspaper, phase: 1 },
   { to: '/maintenance', label: 'Maintenance', icon: Wrench, phase: 2 },
-  { to: '/users', label: 'User Management', icon: Users, phase: 2 },
-  { to: '/notifications', label: 'Push Notif', icon: Bell, phase: 2 },
+  { to: '/users', label: 'Users', icon: Users, phase: 2 },
+  { to: '/notifications', label: 'Notifications', icon: Bell, phase: 2 },
   { to: '/stats', label: 'Stats', icon: BarChart3, phase: 2 },
-  { to: '/tickets', label: 'Support Tickets', icon: Ticket, phase: 2 },
+  { to: '/tickets', label: 'Tickets', icon: Ticket, phase: 2 },
   { to: '/activity-log', label: 'Activity Log', icon: History, phase: 2 },
 ]
 
-export function Sidebar() {
-  const { signOut, user } = useAuth()
-  const navigate = useNavigate()
+type SidebarProps = {
+  /** Called after a nav link is clicked (used to close the mobile drawer). */
+  onNavigate?: () => void
+}
 
-  async function handleLogout() {
-    await signOut()
-    navigate('/login', { replace: true })
-  }
+export function Sidebar({ onNavigate }: SidebarProps) {
+  const { user } = useAuth()
 
   return (
-    <aside className="w-60 shrink-0 h-screen sticky top-0 bg-bg-base border-r border-border flex flex-col">
+    <aside className="w-64 shrink-0 h-screen bg-bg-base border-r border-border flex flex-col">
       {/* Logo header */}
-      <div className="h-16 flex items-center gap-2.5 px-5 border-b border-border">
+      <div className="h-16 flex items-center gap-2.5 px-5 border-b border-border shrink-0">
         <div className="h-8 w-8 rounded-btn border border-accent-cyan/40 bg-accent-cyan/5 flex items-center justify-center">
           <Zap className="h-4 w-4 text-accent-cyan" strokeWidth={2.5} />
         </div>
@@ -61,7 +58,10 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3">
+      <nav className="flex-1 overflow-y-auto py-4 px-3 scrollbar-none">
+        <p className="px-3 mb-2 text-[10px] font-medium uppercase tracking-widest2 text-text-dim">
+          Menu
+        </p>
         <ul className="space-y-0.5">
           {items.map((item) => {
             const Icon = item.icon
@@ -70,19 +70,23 @@ export function Sidebar() {
                 <NavLink
                   to={item.to}
                   end={item.to === '/'}
+                  onClick={onNavigate}
                   className={({ isActive }) =>
                     [
-                      'flex items-center gap-3 px-3 py-2 rounded-btn text-sm transition-colors duration-200 border-l-2',
+                      'group flex items-center gap-3 px-3 py-2 rounded-btn text-sm transition-all duration-150 border-l-2',
                       isActive
-                        ? 'bg-accent-cyan/5 text-text-primary border-accent-cyan'
-                        : 'text-text-muted border-transparent hover:bg-bg-hover hover:text-text-primary',
+                        ? 'bg-bg-active text-text-primary border-accent-cyan font-medium'
+                        : 'text-text-muted border-transparent hover:bg-bg-hover hover:text-text-secondary',
                     ].join(' ')
                   }
                 >
-                  <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+                  <Icon
+                    className="h-4 w-4 shrink-0 transition-colors"
+                    strokeWidth={2}
+                  />
                   <span className="truncate">{item.label}</span>
                   {item.phase === 2 && (
-                    <span className="ml-auto text-[9px] uppercase tracking-widest2 text-text-dim border border-border rounded px-1 py-0.5">
+                    <span className="ml-auto text-[9px] uppercase tracking-widest2 text-text-dim border border-border rounded-pill px-1.5 py-0.5 group-hover:text-text-muted">
                       Soon
                     </span>
                   )}
@@ -93,18 +97,17 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      {/* User + Logout */}
-      <div className="border-t border-border p-3">
-        <div className="px-3 py-2 mb-2">
-          <p className="text-xs text-text-dim truncate">
-            {user?.email ?? 'Tidak ada sesi'}
-          </p>
-          <p className="text-[10px] uppercase tracking-widest2 text-text-dim mt-0.5">Admin</p>
+      {/* User footer */}
+      <div className="border-t border-border p-3 shrink-0">
+        <div className="flex items-center gap-2.5 px-2 py-2">
+          <span className="h-8 w-8 rounded-full bg-gradient-to-br from-accent-cyan to-accent-violet flex items-center justify-center text-xs font-bold text-black shrink-0">
+            {(user?.email ?? 'A')[0]?.toUpperCase() ?? 'A'}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-text-secondary truncate">{user?.email ?? 'Tidak ada sesi'}</p>
+            <p className="text-[10px] uppercase tracking-widest2 text-text-dim mt-0.5">Admin</p>
+          </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-start">
-          <LogOut className="h-4 w-4" strokeWidth={2} />
-          Logout
-        </Button>
       </div>
     </aside>
   )

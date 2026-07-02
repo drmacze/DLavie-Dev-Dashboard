@@ -19,21 +19,20 @@ type NavItem = {
   to: string
   label: string
   icon: typeof LayoutDashboard
-  phase: 1 | 2
 }
 
 const items: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, phase: 1 },
-  { to: '/upload', label: 'Upload Patch', icon: Upload, phase: 1 },
-  { to: '/manifest', label: 'Manifest Editor', icon: FileText, phase: 1 },
-  { to: '/patches', label: 'Patch Management', icon: Package, phase: 2 },
-  { to: '/feed', label: 'Feed / Berita', icon: Newspaper, phase: 1 },
-  { to: '/maintenance', label: 'Maintenance', icon: Wrench, phase: 2 },
-  { to: '/users', label: 'Users', icon: Users, phase: 2 },
-  { to: '/notifications', label: 'Notifications', icon: Bell, phase: 2 },
-  { to: '/stats', label: 'Stats', icon: BarChart3, phase: 2 },
-  { to: '/tickets', label: 'Tickets', icon: Ticket, phase: 2 },
-  { to: '/activity-log', label: 'Activity Log', icon: History, phase: 2 },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/upload', label: 'Upload Patch', icon: Upload },
+  { to: '/manifest', label: 'Manifest Editor', icon: FileText },
+  { to: '/patches', label: 'Patch Management', icon: Package },
+  { to: '/feed', label: 'Feed / Berita', icon: Newspaper },
+  { to: '/maintenance', label: 'Maintenance', icon: Wrench },
+  { to: '/users', label: 'Users', icon: Users },
+  { to: '/notifications', label: 'Notifications', icon: Bell },
+  { to: '/stats', label: 'Stats', icon: BarChart3 },
+  { to: '/tickets', label: 'Tickets', icon: Ticket },
+  { to: '/activity-log', label: 'Activity Log', icon: History },
 ]
 
 type SidebarProps = {
@@ -85,11 +84,6 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                     strokeWidth={2}
                   />
                   <span className="truncate">{item.label}</span>
-                  {item.phase === 2 && (
-                    <span className="ml-auto text-[9px] uppercase tracking-widest2 text-text-dim border border-border rounded-pill px-1.5 py-0.5 group-hover:text-text-muted">
-                      Soon
-                    </span>
-                  )}
                 </NavLink>
               </li>
             )

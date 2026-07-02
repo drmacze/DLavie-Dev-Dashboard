@@ -17,6 +17,10 @@ export type GitHubRelease = {
   tag_name: string
   name: string | null
   published_at: string
+  body?: string | null
+  draft?: boolean
+  prerelease?: boolean
+  html_url?: string
   assets: GitHubAsset[]
 }
 
@@ -60,18 +64,7 @@ export type Manifest = {
 
 /** Fetch all releases + summed download counts from GitHub API */
 export async function fetchDownloadStats(): Promise<DownloadStats> {
-  const res = await fetch(
-    `${GITHUB_API}/repos/${LAUNCHER_REPO}/releases?per_page=100`,
-    {
-      headers: { Accept: 'application/vnd.github+json' },
-    },
-  )
-
-  if (!res.ok) {
-    throw new Error(`GitHub API error: ${res.status}`)
-  }
-
-  const releases: GitHubRelease[] = await res.json()
+  const releases = await fetchReleases()
 
   let totalDownloads = 0
   let totalAssets = 0
@@ -99,6 +92,22 @@ export async function fetchDownloadStats(): Promise<DownloadStats> {
     latestVersion: releases[0]?.tag_name ?? null,
     releases: releasesSummary,
   }
+}
+
+/** Fetch all releases (full payload) from GitHub API */
+export async function fetchReleases(): Promise<GitHubRelease[]> {
+  const res = await fetch(
+    `${GITHUB_API}/repos/${LAUNCHER_REPO}/releases?per_page=100`,
+    {
+      headers: { Accept: 'application/vnd.github+json' },
+    },
+  )
+
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status}`)
+  }
+
+  return (await res.json()) as GitHubRelease[]
 }
 
 /** Fetch the launcher manifest from GitHub release asset */
@@ -182,4 +191,69 @@ export function formatChartDate(iso: string): string {
 /** Format a number with thousand separators */
 export function formatNumber(n: number): string {
   return n.toLocaleString('id-ID')
+}
+
+/** Compact number formatting: 1234 → "1.2K", 1234567 → "1.2M" */
+export function formatCompact(n: number): string {
+  if (n < 1000) return String(n)
+  if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10_000 ? 1 : 0)}K`
+  if (n < 1_000_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  return `${(n / 1_000_000_000).toFixed(1)}B`
+}
+
+/** Copy text to clipboard with graceful fallback */
+export async function copyToClipboard(text: string): Promise<void> {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      return
+    }
+    // Fallback for non-secure contexts
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+  } catch (e) {
+    console.warn('copyToClipboard failed', e)
+  }
+}
+
+/** Trigger a CSV download in the browser */
+export function downloadCSV(filename: string, rows: (string | number)[][]): void {
+  const escape = (v: string | number) => {
+    const s = String(v ?? '')
+    if (/[",\n\r]/.test(s)) {
+      return `"${s.replace(/"/g, '""')}"`
+    }
+    return s
+  }
+  const csv = rows.map((row) => row.map(escape).join(',')).join('\r\n')
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/** Truncate a long hash/id for display, e.g. "abc123…def789" */
+export function truncateMiddle(s: string, head = 8, tail = 6): string {
+  if (!s) return ''
+  if (s.length <= head + tail + 1) return s
+  return `${s.slice(0, head)}…${s.slice(-tail)}`
+}
+
+/** GitHub release SHA256 — try to extract from manifest or assets */
+export function extractSha256FromRelease(release: GitHubRelease): string | null {
+  // GitHub releases don't include SHA256 natively. Some repos include it in body.
+  const body = (release as unknown as { body?: string }).body ?? ''
+  const match = body.match(/sha[\s-]?256[:\s]*([a-fA-F0-9]{64})/i)
+  return match ? match[1] : null
 }

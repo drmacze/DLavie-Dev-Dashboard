@@ -17,7 +17,9 @@ import { Input, Textarea, Select } from '@/components/Input'
 import { Badge, Modal } from '@/components/Modal'
 import { EmptyState } from '@/components/EmptyState'
 import { SkeletonFeedCard } from '@/components/Skeleton'
+import { SetupRequired, isMissingTableError } from '@/components/SetupRequired'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 import type { FeedPost } from '@/lib/supabase'
 import { formatDate, formatRelative } from '@/lib/api'
 
@@ -29,10 +31,44 @@ const typeBadge: Record<PostType, { variant: 'cyan' | 'violet' | 'amber'; label:
   maintenance: { variant: 'amber', label: 'Maintenance' },
 }
 
+const FEED_SQL = `-- Tabel feed_posts untuk Feed / Berita
+create table if not exists public.feed_posts (
+  id uuid primary key default gen_random_uuid(),
+  author_id uuid not null references public.profiles(id) on delete cascade,
+  type text not null default 'info',
+  title text not null,
+  body text not null,
+  image_url text,
+  visibility text not null default 'public',
+  pinned boolean not null default false,
+  official boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Enable RLS
+alter table public.feed_posts enable row level security;
+
+-- Policy: admin bisa kelola, user publik bisa baca yang visible
+create policy "Public read feed_posts"
+  on public.feed_posts for select
+  using (visibility = 'public');
+
+create policy "Admin manage feed_posts"
+  on public.feed_posts for all
+  using (
+    exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.role in ('admin', 'developer')
+    )
+  );`
+
 export default function Feed() {
   const qc = useQueryClient()
+  const { user } = useAuth()
   const [formOpen, setFormOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<FeedPost | null>(null)
+  const [setupError, setSetupError] = useState(false)
 
   // Read
   const { data: posts = [], isLoading, error, refetch, isFetching } = useQuery<FeedPost[]>({
@@ -45,7 +81,12 @@ export default function Feed() {
       if (error) throw error
       return (data ?? []) as FeedPost[]
     },
+    retry: false,
   })
+
+  useEffect(() => {
+    setSetupError(isMissingTableError(error))
+  }, [error])
 
   // Create
   const createMutation = useMutation({
@@ -56,8 +97,18 @@ export default function Feed() {
       pinned: boolean
       official: boolean
     }) => {
-      const { error } = await supabase.from('feed_posts').insert(input)
+      const { error } = await supabase.from('feed_posts').insert({
+        ...input,
+        author_id: user?.id,
+      })
       if (error) throw error
+      // best-effort audit log
+      await supabase.from('audit_logs').insert({
+        actor_id: user?.id ?? null,
+        action: 'feed_post',
+        target_type: 'feed_post',
+        after: input as unknown as Record<string, unknown>,
+      })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['feed-posts'] })
@@ -88,7 +139,7 @@ export default function Feed() {
             <RefreshCw className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Button size="sm" onClick={() => setFormOpen(true)}>
+          <Button size="sm" onClick={() => setFormOpen(true)} disabled={setupError}>
             <Plus className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Post Baru</span>
             <span className="sm:hidden">Post</span>
@@ -96,7 +147,14 @@ export default function Feed() {
         </>
       }
     >
-      {error ? (
+      {setupError ? (
+        <SetupRequired
+          tableName="feed_posts"
+          sql={FEED_SQL}
+          onRetry={() => refetch()}
+          description="Modul Feed menyimpan post pengumuman di tabel feed_posts. Jalankan SQL di bawah untuk membuat tabel dan policy-nya."
+        />
+      ) : error ? (
         <Card>
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-danger shrink-0 mt-0.5" />

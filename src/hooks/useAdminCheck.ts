@@ -38,8 +38,8 @@ export function useAdminCheck(): AdminState {
     if (!user) return
     if (isLoading) return
 
-    if (!data || data.role !== 'admin') {
-      setError('Akun Anda bukan admin. Hubungi developer utama untuk akses.')
+    if (!data || (data.role !== 'admin' && data.role !== 'developer')) {
+      setError('Akun Anda bukan admin/developer. Hubungi developer utama untuk akses.')
       // sign out non-admins
       signOut().catch(() => {})
     } else {
@@ -48,7 +48,7 @@ export function useAdminCheck(): AdminState {
   }, [data, isLoading, user, signOut])
 
   return {
-    isAdmin: !!user && !!data && data.role === 'admin',
+    isAdmin: !!user && !!data && (data.role === 'admin' || data.role === 'developer'),
     loading: isLoading,
     error,
   }

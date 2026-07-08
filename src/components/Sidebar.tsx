@@ -11,6 +11,7 @@ import {
   BarChart3,
   Ticket,
   History,
+  Star,
   Zap,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -33,6 +34,7 @@ const items: NavItem[] = [
   { to: '/stats', label: 'Stats', icon: BarChart3 },
   { to: '/tickets', label: 'Tickets', icon: Ticket },
   { to: '/activity-log', label: 'Activity Log', icon: History },
+  { to: '/ratings', label: 'Ratings', icon: Star },
 ]
 
 type SidebarProps = {

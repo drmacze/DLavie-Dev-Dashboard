@@ -18,6 +18,7 @@ const Notifications = lazy(() => import('@/pages/Notifications'))
 const Stats = lazy(() => import('@/pages/Stats'))
 const Tickets = lazy(() => import('@/pages/Tickets'))
 const ActivityLog = lazy(() => import('@/pages/ActivityLog'))
+const Ratings = lazy(() => import('@/pages/Ratings'))
 
 function FullScreenLoader({ label = 'Memuat…' }: { label?: string }) {
   return (
@@ -91,6 +92,7 @@ function AppRoutes() {
                   <Route path="/stats" element={<Stats />} />
                   <Route path="/tickets" element={<Tickets />} />
                   <Route path="/activity-log" element={<ActivityLog />} />
+                  <Route path="/ratings" element={<Ratings />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </PageTransition>

@@ -101,6 +101,14 @@ function NewsPostsSection() {
   const { data: posts = [], isLoading, error, refetch, isFetching } = useQuery<NewsPost[]>({
     queryKey: ['news-posts'],
     queryFn: async () => {
+      // v7.9.78: Auto-publish scheduled posts yang sudah due (no pg_cron needed)
+      // Call RPC function sebelum fetch — published_count returned tapi tidak dipakai
+      try {
+        await supabase.rpc('publish_due_scheduled_news')
+      } catch (e) {
+        // Fail-open: kalau RPC belum ada, lanjut fetch saja
+        console.warn('publish_due_scheduled_news RPC failed (non-fatal):', e)
+      }
       const { data, error } = await supabase
         .from('news_posts')
         .select('*')

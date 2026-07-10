@@ -13,6 +13,7 @@ import {
   History,
   Star,
   Zap,
+  Megaphone,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -27,7 +28,8 @@ const items: NavItem[] = [
   { to: '/upload', label: 'Upload Patch', icon: Upload },
   { to: '/manifest', label: 'Manifest Editor', icon: FileText },
   { to: '/patches', label: 'Patch Management', icon: Package },
-  { to: '/feed', label: 'Feed / Berita', icon: Newspaper },
+  { to: '/feed', label: 'Feed Komunitas', icon: Newspaper },
+  { to: '/berita', label: 'Berita & Banner', icon: Megaphone },
   { to: '/maintenance', label: 'Maintenance', icon: Wrench },
   { to: '/users', label: 'Users', icon: Users },
   { to: '/notifications', label: 'Notifications', icon: Bell },

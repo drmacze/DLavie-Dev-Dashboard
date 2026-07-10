@@ -11,6 +11,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const UploadPatch = lazy(() => import('@/pages/UploadPatch'))
 const ManifestEditor = lazy(() => import('@/pages/ManifestEditor'))
 const Feed = lazy(() => import('@/pages/Feed'))
+const Berita = lazy(() => import('@/pages/Berita'))
 const Patches = lazy(() => import('@/pages/Patches'))
 const Maintenance = lazy(() => import('@/pages/Maintenance'))
 const Users = lazy(() => import('@/pages/Users'))
@@ -85,6 +86,7 @@ function AppRoutes() {
                   <Route path="/upload" element={<UploadPatch />} />
                   <Route path="/manifest" element={<ManifestEditor />} />
                   <Route path="/feed" element={<Feed />} />
+                  <Route path="/berita" element={<Berita />} />
                   <Route path="/patches" element={<Patches />} />
                   <Route path="/maintenance" element={<Maintenance />} />
                   <Route path="/users" element={<Users />} />

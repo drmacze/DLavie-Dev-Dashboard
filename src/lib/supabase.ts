@@ -28,3 +28,40 @@ export type FeedPost = {
   official: boolean
   created_at: string
 }
+
+// v7.9.78: Berita — News Posts (official news from dev, separate from community feed)
+export type NewsLabelType = 'maintenance' | 'information' | 'other'
+export type NewsPost = {
+  id: string
+  author_id: string | null
+  title: string
+  body: string
+  footer_text: string | null
+  image_url: string | null
+  label_type: NewsLabelType
+  official: boolean  // always true
+  scheduled_at: string | null
+  published_at: string | null  // null = draft
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+// v7.9.78: Banner Slides — auto-rotating hero banner for Launcher Beranda
+export type BannerMediaType = 'image' | 'gif' | 'video'
+export type BannerSlide = {
+  id: string
+  sort_order: number
+  title: string | null
+  subtitle: string | null
+  media_type: BannerMediaType
+  media_url: string
+  link_url: string | null
+  duration_seconds: number
+  is_active: boolean
+  starts_at: string | null
+  ends_at: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}

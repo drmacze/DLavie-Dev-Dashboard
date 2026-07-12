@@ -1293,21 +1293,22 @@ function BannerFormModal({
           onChange={(e) => setValues((v) => ({ ...v, link_url: e.target.value }))}
         />
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block mb-1.5 text-xs font-medium text-text-muted uppercase tracking-widest2">
-              Durasi Auto-Slide (detik)
-            </label>
-            <Input
-              id="banner-duration"
-              type="number"
-              min={1}
-              max={60}
-              value={values.duration_seconds}
-              onChange={(e) => setValues((v) => ({ ...v, duration_seconds: parseInt(e.target.value) || 5 }))}
-              required
-            />
-          </div>
+        <div>
+          <label className="block mb-1.5 text-xs font-medium text-text-muted uppercase tracking-widest2">
+            Durasi Auto-Slide (detik) — 1 sampai 60
+          </label>
+          <Input
+            id="banner-duration"
+            type="number"
+            min={1}
+            max={60}
+            value={values.duration_seconds}
+            onChange={(e) => setValues((v) => ({ ...v, duration_seconds: parseInt(e.target.value) || 5 }))}
+            required
+          />
+          <p className="mt-1 text-[10px] text-text-dim">
+            Berapa detik setiap banner tampil sebelum ganti ke banner berikutnya.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
